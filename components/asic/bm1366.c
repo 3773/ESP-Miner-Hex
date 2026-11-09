@@ -199,24 +199,10 @@ float BM1366_send_hash_frequency(float target_freq)
     return new_freq;
 }
 
-uint8_t BM1366_init(GlobalState * GLOBAL_STATE)
+// init4/init5, chain inactive and one address per chip (address space split
+// evenly)
+static void _address_chips(int count)
 {
-    // set version mask
-    for (int i = 0; i < 3; i++) {
-        BM1366_set_version_mask(STRATUM_DEFAULT_VERSION_MASK);
-    }
-
-    // read register 00 on all chips
-    unsigned char init3[7] = {0x55, 0xAA, 0x52, 0x05, 0x00, 0x00, 0x0A};
-    _send_simple(init3, 7);
-
-    uint16_t asic_count = GLOBAL_STATE->DEVICE_CONFIG.family.asic_count;
-    int chip_counter = count_asic_chips(asic_count, BM1366_CHIP_ID, BM1366_CHIP_ID_RESPONSE_LENGTH);
-
-    if (chip_counter == 0) {
-        return 0;
-    }
-
     unsigned char init4[11] = {0x55, 0xAA, 0x51, 0x09, 0x00, 0xA8, 0x00, 0x07, 0x00, 0x00, 0x03};
     _send_simple(init4, 11);
 
@@ -227,11 +213,16 @@ uint8_t BM1366_init(GlobalState * GLOBAL_STATE)
     _send_chain_inactive();
 
     // split the chip address space evenly
-    address_interval = 256 / chip_counter;
-    for (uint8_t i = 0; i < chip_counter; i++) {
+    address_interval = 256 / count;
+    for (uint8_t i = 0; i < count; i++) {
         //{ 0x55, 0xAA, 0x40, 0x05, 0x00, 0x00, 0x1C };
         _set_chip_address(i * address_interval);
     }
+}
+
+static void _configure_chips(GlobalState * GLOBAL_STATE, int chip_counter)
+{
+    uint16_t asic_count = GLOBAL_STATE->DEVICE_CONFIG.family.asic_count;
 
     unsigned char init135[11] = {0x55, 0xAA, 0x51, 0x09, 0x00, 0x3C, 0x80, 0x00, 0x85, 0x40, 0x0C};
     _send_simple(init135, 11);
@@ -281,6 +272,164 @@ uint8_t BM1366_init(GlobalState * GLOBAL_STATE)
 
     unsigned char init795[11] = {0x55, 0xAA, 0x51, 0x09, 0x00, 0xA4, 0x90, 0x00, 0xFF, 0xFF, 0x1C};
     _send_simple(init795, 11);
+}
+
+// ---------------------------------------------------------------------------
+// Boards with stacked voltage domains (bitaxeHex, bring-up hook registered)
+//
+// When all chips answer the broadcast chip id read at once, the answers of the
+// top domain get lost - on a Hex 304 always "4 chip(s) detected on the chain,
+// expected 6", although chips 5 and 6 take commands and return nonces. So
+// every expected chip is addressed and asked on its own; that count decides
+// about a retry (with another power cycle of the stack by the board code).
+// ---------------------------------------------------------------------------
+#define BM1366_BRINGUP_ATTEMPTS 3
+#define BM1366_COUNT_QUIET_MS 500
+#define BM1366_VERIFY_QUIET_MS 60
+
+static bm1366_bringup_hook_t bringup_hook = NULL;
+
+void BM1366_set_bringup_hook(bm1366_bringup_hook_t hook)
+{
+    bringup_hook = hook;
+}
+
+// Broadcast "read register 0x00" and count the BM1366 chip id frames
+// (AA 55 13 66 ...). All bytes are collected until the line is quiet and then
+// searched, so a stray byte cannot shift the framing and hide chips.
+static int _count_chips_tolerant(void)
+{
+    static uint8_t rx[16 * BM1366_CHIP_ID_RESPONSE_LENGTH];
+    int len = 0;
+
+    SERIAL_clear_buffer();
+
+    // read register 00 on all chips
+    unsigned char init3[7] = {0x55, 0xAA, 0x52, 0x05, 0x00, 0x00, 0x0A};
+    _send_simple(init3, 7);
+
+    while (len < (int) sizeof(rx)) {
+        int16_t n = SERIAL_rx(rx + len, sizeof(rx) - len, BM1366_COUNT_QUIET_MS);
+        if (n <= 0) {
+            break;
+        }
+        len += n;
+    }
+
+    int chips = 0;
+    for (int i = 0; i + 4 <= len;) {
+        if (rx[i] == 0xAA && rx[i + 1] == 0x55 && rx[i + 2] == 0x13 && rx[i + 3] == 0x66) {
+            chips++;
+            i += BM1366_CHIP_ID_RESPONSE_LENGTH;
+        } else {
+            i++;
+        }
+    }
+    if (len != chips * BM1366_CHIP_ID_RESPONSE_LENGTH) {
+        ESP_LOGW(TAG, "Chip count: %d byte(s) received for %d chip id frame(s)", len, chips);
+    }
+    return chips;
+}
+
+// Ask every addressed chip on its own for its chip id (no collisions).
+static int _verify_chips(int count)
+{
+    uint8_t rx[3 * BM1366_CHIP_ID_RESPONSE_LENGTH];
+    int ok = 0;
+
+    for (int i = 0; i < count; i++) {
+        uint8_t address = i * address_interval;
+        unsigned char read_reg0[2] = {address, 0x00};
+        int len = 0;
+
+        SERIAL_clear_buffer();
+        _send_BM1366((TYPE_CMD | GROUP_SINGLE | CMD_READ), read_reg0, 2, BM1366_SERIALTX_DEBUG);
+        while (len < (int) sizeof(rx)) {
+            int16_t n = SERIAL_rx(rx + len, sizeof(rx) - len, BM1366_VERIFY_QUIET_MS);
+            if (n <= 0) {
+                break;
+            }
+            len += n;
+        }
+
+        bool found = false;
+        for (int j = 0; j + 4 <= len; j++) {
+            if (rx[j] == 0xAA && rx[j + 1] == 0x55 && rx[j + 2] == 0x13 && rx[j + 3] == 0x66) {
+                found = true;
+                break;
+            }
+        }
+        if (found) {
+            ok++;
+        } else {
+            ESP_LOGW(TAG, "Chip %d (address 0x%02X) does not answer", i + 1, address);
+        }
+    }
+    return ok;
+}
+
+static uint8_t _init_stacked(GlobalState * GLOBAL_STATE)
+{
+    uint16_t asic_count = GLOBAL_STATE->DEVICE_CONFIG.family.asic_count;
+    int answered = 0, verified = 0, attempts = 0;
+
+    for (int attempt = 0; attempt < BM1366_BRINGUP_ATTEMPTS; attempt++) {
+        attempts = attempt + 1;
+        bringup_hook(BM1366_BRINGUP_PREPARE, attempt, verified);
+
+        // set version mask
+        for (int i = 0; i < 3; i++) {
+            BM1366_set_version_mask(STRATUM_DEFAULT_VERSION_MASK);
+        }
+
+        answered = _count_chips_tolerant();
+        _address_chips(asic_count);
+        verified = _verify_chips(asic_count);
+        ESP_LOGI(TAG, "Detection attempt %d: %d chip(s) answered the broadcast, %d of %d answered one by one",
+                 attempts, answered, verified, asic_count);
+        bringup_hook(BM1366_BRINGUP_COUNTED, attempt, verified);
+        if (verified >= asic_count) {
+            break;
+        }
+    }
+
+    ESP_LOGI(TAG, "%i chip(s) detected on the chain, expected %i", verified, asic_count);
+    if (verified == 0) {
+        return 0;
+    }
+    if (verified < asic_count) {
+        ESP_LOGE(TAG, "Only %d of %d chip(s) answer after %d attempt(s), all %d are configured",
+                 verified, asic_count, attempts, asic_count);
+    }
+
+    _configure_chips(GLOBAL_STATE, asic_count);
+    return verified;
+}
+
+uint8_t BM1366_init(GlobalState * GLOBAL_STATE)
+{
+    if (bringup_hook != NULL) {
+        return _init_stacked(GLOBAL_STATE);
+    }
+
+    // set version mask
+    for (int i = 0; i < 3; i++) {
+        BM1366_set_version_mask(STRATUM_DEFAULT_VERSION_MASK);
+    }
+
+    // read register 00 on all chips
+    unsigned char init3[7] = {0x55, 0xAA, 0x52, 0x05, 0x00, 0x00, 0x0A};
+    _send_simple(init3, 7);
+
+    uint16_t asic_count = GLOBAL_STATE->DEVICE_CONFIG.family.asic_count;
+    int chip_counter = count_asic_chips(asic_count, BM1366_CHIP_ID, BM1366_CHIP_ID_RESPONSE_LENGTH);
+
+    if (chip_counter == 0) {
+        return 0;
+    }
+
+    _address_chips(chip_counter);
+    _configure_chips(GLOBAL_STATE, chip_counter);
 
     return chip_counter;
 }

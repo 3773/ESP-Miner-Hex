@@ -11,6 +11,10 @@
 
 #define EPSILON 0.0001f
 #define POLL_TIME_MS 100
+// fan until the first valid temperature (chips set up); bitaxeHex: 40 % instead
+// of 70 % (Daniel 2026-11-09), the stack draws little before the chips hash
+#define STARTUP_FAN_PERCENT 70.0f
+#define HEX_STARTUP_FAN_PERCENT 40.0f
 #define LOG_TIME_MS 2000
 
 #define PID_P 5.0
@@ -123,7 +127,7 @@ void FAN_CONTROLLER_task(void * pvParameters)
                         ESP_LOGI(TAG, "Temp: %.1f°C, SetPoint: %.1f°C, Output: %.1f%%", pid_input, pid_setPoint, pid_output);
                     }
                 } else {
-                    update_fan_speed(GLOBAL_STATE, 70.0f, "Startup");
+                    update_fan_speed(GLOBAL_STATE, GLOBAL_STATE->hex_bringup ? HEX_STARTUP_FAN_PERCENT : STARTUP_FAN_PERCENT, "Startup");
                 }
             } else { // Manual fan speed
                 uint16_t fan_perc_target = nvs_config_get_u16(NVS_CONFIG_MANUAL_FAN_SPEED);

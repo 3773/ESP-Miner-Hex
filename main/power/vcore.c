@@ -216,3 +216,18 @@ uint8_t VCORE_get_phase_count(GlobalState * GLOBAL_STATE)
     }
     return 1;
 }
+
+void VCORE_get_hex_domains(GlobalState * GLOBAL_STATE, int domain_mv[3])
+{
+    if (GLOBAL_STATE->hex_domain_sampling != 1) {
+        domain_mv[0] = domain_mv[1] = domain_mv[2] = -1;
+        return;
+    }
+    int vdd1 = ADC_get_hex_vdd_mv(1);
+    int vdd2 = ADC_get_hex_vdd_mv(2);
+    int vout = GLOBAL_STATE->DEVICE_CONFIG.TPS546 ? (int) (TPS546_get_vout() * 1000.0f) : -1;
+
+    domain_mv[0] = vdd1;
+    domain_mv[1] = (vdd1 >= 0 && vdd2 >= 0) ? vdd2 - vdd1 : -1;
+    domain_mv[2] = (vdd2 >= 0 && vout >= 0) ? vout - vdd2 : -1;
+}

@@ -1,4 +1,6 @@
 #include "esp_log.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 #include "esp_adc/adc_oneshot.h"
 #include "esp_adc/adc_cali.h"
 #include "esp_adc/adc_cali_scheme.h"
@@ -10,6 +12,16 @@ static const char * TAG = "adc";
 
 static adc_cali_handle_t adc1_cali_chan1_handle;
 static adc_oneshot_unit_handle_t adc1_handle;
+
+// bitaxeHex domain sampling (see adc.h)
+#define HEX_VDD1_CHANNEL ADC_CHANNEL_3   // GPIO14, VDD1_SAMPLE
+#define HEX_VDD2_CHANNEL ADC_CHANNEL_1   // GPIO12, VDD2_SAMPLE
+#define HEX_DIV_TOP 7870
+#define HEX_DIV_BOTTOM 22100
+static adc_oneshot_unit_handle_t adc2_handle;
+static adc_cali_handle_t adc2_cali_vdd1;
+static adc_cali_handle_t adc2_cali_vdd2;
+static bool hex_domains_ready = false;
 
 
 /*---------------------------------------------------------------
@@ -105,4 +117,74 @@ uint16_t ADC_get_vcore(void)
     }
 
     return voltage;
+}
+
+void ADC_init_hex_domains(void)
+{
+    if (hex_domains_ready) {
+        return;
+    }
+    adc_oneshot_unit_init_cfg_t init_config2 = {
+        .unit_id = ADC_UNIT_2,
+    };
+    if (adc_oneshot_new_unit(&init_config2, &adc2_handle) != ESP_OK) {
+        ESP_LOGE(TAG, "ADC2 init failed, no domain voltages");
+        return;
+    }
+    adc_oneshot_chan_cfg_t config = {
+        .atten = ADC_ATTEN_DB_12,
+        .bitwidth = ADC_BITWIDTH_DEFAULT,
+    };
+    if (adc_oneshot_config_channel(adc2_handle, HEX_VDD1_CHANNEL, &config) != ESP_OK ||
+        adc_oneshot_config_channel(adc2_handle, HEX_VDD2_CHANNEL, &config) != ESP_OK) {
+        ESP_LOGE(TAG, "ADC2 channel config failed, no domain voltages");
+        return;
+    }
+    bool ok1 = adc_calibration_init(ADC_UNIT_2, HEX_VDD1_CHANNEL, ADC_ATTEN_DB_12, &adc2_cali_vdd1);
+    bool ok2 = adc_calibration_init(ADC_UNIT_2, HEX_VDD2_CHANNEL, ADC_ATTEN_DB_12, &adc2_cali_vdd2);
+    hex_domains_ready = ok1 && ok2;
+}
+
+int ADC_get_hex_vdd_mv(int domain)
+{
+    if (!hex_domains_ready || (domain != 1 && domain != 2)) {
+        return -1;
+    }
+    adc_channel_t ch = domain == 1 ? HEX_VDD1_CHANNEL : HEX_VDD2_CHANNEL;
+    adc_cali_handle_t cali = domain == 1 ? adc2_cali_vdd1 : adc2_cali_vdd2;
+
+    // ADC2 is shared with Wi-Fi; a read can be refused while Wi-Fi uses it.
+    int sum = 0, n = 0;
+    for (int tries = 0; tries < 40 && n < 8; tries++) {
+        int raw = 0, mv = 0;
+        if (adc_oneshot_read(adc2_handle, ch, &raw) == ESP_OK && adc_cali_raw_to_voltage(cali, raw, &mv) == ESP_OK) {
+            sum += mv;
+            n++;
+        } else {
+            vTaskDelay(1);
+        }
+    }
+    if (n == 0) {
+        return -1;
+    }
+    return (int) ((int64_t) (sum / n) * (HEX_DIV_TOP + HEX_DIV_BOTTOM) / HEX_DIV_BOTTOM);
+}
+
+int ADC_get_stack_mv(void)
+{
+    // GPIO2 = ADC1 ch1 (set up by ADC_init): top of the stack through the same
+    // 7.87k/22.1k divider on every bitaxeHex revision (302/303: VDDD, 304: VDD3)
+    int sum = 0, n = 0;
+    for (int i = 0; i < 8; i++) {
+        int raw = 0, mv = 0;
+        if (adc_oneshot_read(adc1_handle, ADC_CHANNEL, &raw) == ESP_OK &&
+            adc_cali_raw_to_voltage(adc1_cali_chan1_handle, raw, &mv) == ESP_OK) {
+            sum += mv;
+            n++;
+        }
+    }
+    if (n == 0) {
+        return -1;
+    }
+    return (int) ((int64_t) (sum / n) * (HEX_DIV_TOP + HEX_DIV_BOTTOM) / HEX_DIV_BOTTOM);
 }

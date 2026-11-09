@@ -158,6 +158,8 @@ void app_main(void)
     esp_err_t system_init_ret = SYSTEM_init_peripherals(&GLOBAL_STATE);
     
     if (system_init_ret == ESP_OK) {
+        // bitaxeHex: core stack stays off until the controlled bring-up in asic_initialize()
+        asic_hex_bringup_register(&GLOBAL_STATE);
         if (xTaskCreate(POWER_MANAGEMENT_task, "power management", 8192, (void *) &GLOBAL_STATE, 10, NULL) != pdPASS) {
             ESP_LOGE(TAG, "Error creating power management task");
         }

@@ -24,6 +24,19 @@ typedef struct __attribute__((__packed__))
 } BM1366_job;
 
 uint8_t BM1366_init(GlobalState * GLOBAL_STATE);
+
+// Bring-up hook for boards with stacked voltage domains (bitaxeHex).
+// PREPARE is called before every detection attempt: the board code power
+// cycles the core stack there, lets all chips run so the domains balance and
+// gives a short reset pulse. COUNTED is called after every attempt with the
+// number of chips that answered when asked one by one.
+typedef enum {
+    BM1366_BRINGUP_PREPARE,
+    BM1366_BRINGUP_COUNTED,
+} bm1366_bringup_stage_t;
+typedef void (*bm1366_bringup_hook_t)(bm1366_bringup_stage_t stage, int attempt, int found);
+void BM1366_set_bringup_hook(bm1366_bringup_hook_t hook);
+
 void BM1366_send_work(GlobalState * GLOBAL_STATE, bm_job * next_bm_job);
 void BM1366_set_version_mask(uint32_t version_mask);
 int BM1366_set_max_baud(void);

@@ -12,5 +12,7 @@ int16_t VCORE_get_voltage_mv(GlobalState * GLOBAL_STATE);
 esp_err_t VCORE_check_fault(GlobalState * GLOBAL_STATE);
 const char* VCORE_get_fault_string(GlobalState * GLOBAL_STATE);
 uint8_t VCORE_get_phase_count(GlobalState * GLOBAL_STATE);
+// bitaxeHex: voltage across each of the 3 stacked domains in mV (-1 = unknown)
+void VCORE_get_hex_domains(GlobalState * GLOBAL_STATE, int domain_mv[3]);
 
 #endif /* VCORE_H_ */

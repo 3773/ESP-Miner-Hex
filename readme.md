@@ -1,3 +1,22 @@
+# ESP-Miner-Hex
+
+Fork der offiziellen [Bitaxe ESP-Miner](https://github.com/bitaxeorg/ESP-Miner)-Firmware mit einem Fix für den **bitaxeHex** (6× BM1366, Platine Rev 302 / 303 / 304).
+*Fork of the official ESP-Miner with a start-up fix for the bitaxeHex (6× BM1366 in three stacked voltage domains).*
+
+**Problem:** Beim Start fragt die Firmware alle Chips gleichzeitig nach ihrer Kennung. Auf dem Hex gehen dabei die Antworten der obersten Spannungsdomäne verloren ("4 chip(s) detected on the chain, expected 6"); die Original-Firmware startet dann nicht.
+
+**Änderungen (Zweig `hex`):**
+- Kontrollierter Start der Kernspannung (aus/an, Reset sofort lösen, damit sich die Domänen ausgleichen, dann kurzer Reset-Impuls).
+- Alle 6 Chips werden adressiert und einzeln abgefragt, bis zu 3 Versuche.
+- Lüfter beim Start 40 % statt 70 %.
+- Dashboard: Sensor unten in der Mitte als "Board Temperature", Lüfterdrehzahl sichtbar.
+- API zusätzlich: `asicDetected`, `asicInitAttempts`, `stackVoltage`, `domainVoltages` (Rev 304).
+- Update-Seite im Dashboard holt Releases aus diesem Repo.
+
+**Updates:** Der Zweig `master` folgt bitaxeorg/ESP-Miner. Bei einem neuen offiziellen Release wird `hex` auf das neue Tag gesetzt, gebaut und hier als Release `vX.Y.Z-HexFixN` mit `esp-miner.bin` veröffentlicht.
+
+---
+
 [![](https://dcbadge.vercel.app/api/server/3E8ca2dkcC)](https://discord.gg/osmu)
 
 ![GitHub Downloads (all assets, all releases)](https://img.shields.io/github/downloads/bitaxeorg/esp-miner/total)

@@ -11,8 +11,12 @@
 #include "asic_init.h"
 #include "asic_reset.h"
 #include "driver/uart.h"
+#include "esp_timer.h"
+#include "adc.h"
 
 #define POLL_RATE 100
+#define DOMAIN_SAMPLE_US 2000000 // bitaxeHex: sample the domain voltages every 2 s
+#define DOMAIN_LOG_EVERY 15      // ... and log them every 30 s
 #define MAX_TEMP 90.0
 #define THROTTLE_TEMP 75.0
 #define SAFE_TEMP 45.0
@@ -124,6 +128,8 @@ void POWER_MANAGEMENT_task(void * pvParameters)
     uint16_t last_known_asic_voltage = 0;
     float last_known_asic_frequency = 0.0;
     bool is_paused = false;
+    int64_t last_domain_us = 0;
+    int domain_log_count = DOMAIN_LOG_EVERY - 1;
 
     while (1) {
         if (GLOBAL_STATE->SELF_TEST_MODULE.is_finished) {
@@ -140,6 +146,26 @@ void POWER_MANAGEMENT_task(void * pvParameters)
         power_management->chip_temp2_avg = Thermal_get_chip_temp2(GLOBAL_STATE);
 
         power_management->vr_temp = Power_get_vreg_temp(GLOBAL_STATE);
+
+        if (GLOBAL_STATE->hex_bringup && !GLOBAL_STATE->ASIC_bringup_active) {
+            int64_t now_us = esp_timer_get_time();
+            if (now_us - last_domain_us >= DOMAIN_SAMPLE_US) {
+                last_domain_us = now_us;
+                GLOBAL_STATE->stack_mv = ADC_get_stack_mv();
+                VCORE_get_hex_domains(GLOBAL_STATE, GLOBAL_STATE->domain_mv);
+                if (++domain_log_count >= DOMAIN_LOG_EVERY) {
+                    domain_log_count = 0;
+                    if (GLOBAL_STATE->hex_domain_sampling == 1) {
+                        ESP_LOGI(TAG, "Domains: D1 %d mV, D2 %d mV, D3 %d mV (stack %d mV)",
+                                 GLOBAL_STATE->domain_mv[0], GLOBAL_STATE->domain_mv[1], GLOBAL_STATE->domain_mv[2],
+                                 GLOBAL_STATE->stack_mv);
+                    } else {
+                        ESP_LOGI(TAG, "Stack: %d mV", GLOBAL_STATE->stack_mv);
+                    }
+                }
+            }
+        }
+
         // User pause, hardware fault, or all pools unreachable
         bool wants_stop = sys_module->mining_paused || sys_module->hardware_fault || sys_module->pools_unavailable;
         if (wants_stop && !is_paused) {
@@ -232,7 +258,8 @@ void POWER_MANAGEMENT_task(void * pvParameters)
                                  ? GLOBAL_STATE-> DEVICE_CONFIG.family.asic.default_frequency_mhz
                                  : nvs_config_get_float(NVS_CONFIG_ASIC_FREQUENCY);
 
-        if (core_voltage != last_core_voltage) {
+        // bitaxeHex: during the bring-up the stack is switched by asic_initialize()
+        if (core_voltage != last_core_voltage && !GLOBAL_STATE->ASIC_bringup_active) {
             ESP_LOGI(TAG, "setting new vcore voltage to %umV", core_voltage);
             VCORE_set_voltage(GLOBAL_STATE, (double) core_voltage / 1000.0);
             last_core_voltage = core_voltage;
@@ -258,7 +285,10 @@ void POWER_MANAGEMENT_task(void * pvParameters)
             ESP_LOGI(TAG, "Overheat mode updated to: %d", sys_module->overheat_mode);
         }
 
-        VCORE_check_fault(GLOBAL_STATE);
+        // the stack is off on purpose during the bitaxeHex bring-up
+        if (!GLOBAL_STATE->ASIC_bringup_active) {
+            VCORE_check_fault(GLOBAL_STATE);
+        }
 
         // looper:
         vTaskDelay(POLL_RATE / portTICK_PERIOD_MS);

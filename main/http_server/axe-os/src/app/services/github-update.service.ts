@@ -23,7 +23,8 @@ export class GithubUpdateService {
 
   public getReleases(): Observable<GithubRelease[]> {
     return this.httpClient.get<GithubRelease[]>(
-      'https://api.github.com/repos/bitaxeorg/esp-miner/releases'
+      // ESP-Miner-Hex: releases of Daniel's fork (bitaxeHex fix), not of bitaxeorg
+      'https://api.github.com/repos/3773/ESP-Miner-Hex/releases'
     ).pipe(
       map((releases: GithubRelease[]) => releases.filter((release: GithubRelease) => !release.prerelease))
     );

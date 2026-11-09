@@ -55,6 +55,15 @@ static void system_api_add_telemetry(cJSON *root, GlobalState *g) {
     cJSON_AddFloatToObject(root, "temp2", g->POWER_MANAGEMENT_MODULE.chip_temp2_avg);
     cJSON_AddFloatToObject(root, "vrTemp", g->POWER_MANAGEMENT_MODULE.vr_temp);
     cJSON_AddFloatToObject(root, "coreVoltageActual", g->POWER_MANAGEMENT_MODULE.core_voltage);
+    if (g->hex_bringup) {
+        // bitaxeHex: chips that answered one by one, attempts, voltage per domain (mV)
+        cJSON_AddNumberToObject(root, "asicDetected", g->asic_detected);
+        cJSON_AddNumberToObject(root, "asicInitAttempts", g->asic_init_attempts);
+        cJSON_AddNumberToObject(root, "stackVoltage", g->stack_mv);
+        if (g->hex_domain_sampling == 1) {
+            cJSON_AddItemToObject(root, "domainVoltages", cJSON_CreateIntArray(g->domain_mv, 3));
+        }
+    }
     cJSON_AddFloatToObject(root, "actualFrequency", g->POWER_MANAGEMENT_MODULE.actual_frequency);
     cJSON_AddFloatToObject(root, "expectedHashrate", g->POWER_MANAGEMENT_MODULE.expected_hashrate);
     cJSON_AddNumberToObject(root, "fanspeed", g->POWER_MANAGEMENT_MODULE.fan_perc);

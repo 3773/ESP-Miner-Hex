@@ -2,6 +2,7 @@
 #define ASIC_INIT_H_
 
 #include <stdint.h>
+#include <stdbool.h>
 
 typedef struct GlobalState GlobalState;
 
@@ -19,5 +20,12 @@ typedef enum {
  * @param mode ASIC_INIT_COLD_BOOT for startup, ASIC_INIT_RECOVERY for live recovery
  */
 uint8_t asic_initialize(GlobalState *GLOBAL_STATE, asic_init_mode_t mode, uint32_t stabilization_delay_ms);
+
+/**
+ * bitaxeHex (stacked voltage domains): register the controlled bring-up of
+ * the core stack for the BM1366 detection. Call after the peripherals are up
+ * and before the power management task starts. Returns false on other boards.
+ */
+bool asic_hex_bringup_register(GlobalState *GLOBAL_STATE);
 
 #endif /* ASIC_INIT_H_ */

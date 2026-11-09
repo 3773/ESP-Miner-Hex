@@ -291,7 +291,7 @@
 
           <div class="mb-4">
             <h6 class="flex justify-between mb-1">
-              @if (info.temp2 > 0) {
+              @if (info.temp2 > 0 && info.boardVersion !== '302' && info.boardVersion !== '303') {
                 ASIC Temperature 1
               } @else {
                 ASIC Temperature
@@ -319,7 +319,11 @@
           @if (info.temp2 > 0) {
             <div class="mb-4">
               <h6 class="flex justify-between mb-1">
-                ASIC Temperature 2
+                @if (info.boardVersion === '302' || info.boardVersion === '303') {
+                  Board Temperature
+                } @else {
+                  ASIC Temperature 2
+                }
                 <span>
                   {{info.temp2}} °C
                 </span>
@@ -374,6 +378,18 @@
               <span>{{info.fanspeed.toFixed(1)}} %</span>
             </h6>
             <app-progressbar [value]="info.fanspeed"></app-progressbar>
+            @if (info.fanrpm > 0 || info.fan2rpm > 0) {
+              <h6 class="flex justify-between mb-1 mt-3">
+                Fan RPM
+                <span>
+                  @if (info.fanrpm > 0 && info.fan2rpm > 0) {
+                    {{info.fanrpm}} / {{info.fan2rpm}} RPM
+                  } @else {
+                    {{info.fanrpm > 0 ? info.fanrpm : info.fan2rpm}} RPM
+                  }
+                </span>
+              </h6>
+            }
           </div>
         </div>
       </div>

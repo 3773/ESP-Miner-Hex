@@ -196,6 +196,15 @@ typedef struct GlobalState
     struct sv2_noise_ctx *sv2_noise_ctx;
 
     bool ASIC_initalized;
+    // bitaxeHex bring-up (power/asic_init.c): core stack stays off and the
+    // power management task leaves it alone while this is set
+    volatile bool ASIC_bringup_active;
+    bool hex_bringup;
+    uint8_t asic_detected;
+    uint8_t asic_init_attempts;
+    int8_t hex_domain_sampling; // -1 unknown, 0 not fitted (Rev 302/303), 1 fitted (Rev 304)
+    int stack_mv;
+    int domain_mv[3];
     bool psram_is_available;
     bool filesystem_is_available;
 
