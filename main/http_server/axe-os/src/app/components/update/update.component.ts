@@ -36,6 +36,9 @@ export class UpdateComponent {
   @ViewChild('progressModal') progressModal?: ModalComponent;
 
   public updateTarget: string = '';
+  // ESP-Miner-Hex: update downloaded by the device from GitHub
+  public githubUpdate: boolean = false;
+  private githubSeenStart: boolean = false;
   public updateStatus: 'progress' | 'success' | 'error' = 'progress';
   public updateMessage: string = '';
 
@@ -57,6 +60,32 @@ export class UpdateComponent {
     );
 
     this.info$ = this.liveDataService.info$;
+
+    // ESP-Miner-Hex: follow the update the device downloads itself from GitHub
+    this.liveDataService.info$.subscribe((info: any) => {
+      if (!this.githubUpdate || this.updateStatus !== 'progress') {
+        return;
+      }
+      const status: string = info?.firmwareUpdateStatus ?? '';
+      const working = status.match(/Working \((\d+)%\)/);
+      if (status.startsWith('Connecting') || working) {
+        this.githubSeenStart = true;
+      }
+      if (!this.githubSeenStart) {
+        return;
+      }
+      if (working) {
+        this.firmwareUpdateProgress = Number(working[1]);
+      } else if (status.startsWith('Rebooting')) {
+        this.firmwareUpdateProgress = 100;
+        this.updateStatus = 'success';
+        this.updateMessage = 'Firmware installed from GitHub. The page will reload when the device comes back online.';
+      } else if (/Error|Wrong/.test(status)) {
+        this.updateStatus = 'error';
+        this.updateMessage = 'GitHub update failed: ' + status + '. The current firmware stays active.';
+        this.githubUpdate = false;
+      }
+    });
 
     // Reload page if firmware version changes
     this.liveDataService.info$.subscribe(info => {
@@ -87,7 +116,28 @@ export class UpdateComponent {
     }
   }
 
+  installFromGithub(url: string) {
+    this.updateTarget = 'Firmware';
+    this.updateStatus = 'progress';
+    this.updateMessage = '';
+    this.firmwareUpdateProgress = 0;
+    this.githubUpdate = true;
+    this.githubSeenStart = false;
+    if (this.progressModal) {
+      this.progressModal.isVisible = true;
+    }
+
+    this.systemService.performGithubOTAUpdate(url).subscribe({
+      error: (err) => {
+        this.updateStatus = 'error';
+        this.updateMessage = getHttpErrorMessage(err);
+        this.githubUpdate = false;
+      }
+    });
+  }
+
   otaUpdate(file: File) {
+    this.githubUpdate = false;
     if (this.firmwareUpload) {
       this.firmwareUpload.nativeElement.value = '';
     }

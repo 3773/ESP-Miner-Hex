@@ -453,6 +453,11 @@ export class SystemApiService {
     return this.otaUpdate(file, '/api/system/OTAWWW');
   }
 
+  // ESP-Miner-Hex: the device downloads esp-miner.bin of a release itself and flashes it
+  public performGithubOTAUpdate(url: string): Observable<any> {
+    return this.httpClient.post('/api/system/OTA/github', { url });
+  }
+
   public switchBootPartition(partition: string, uri: string = ''): Observable<GenericResponse> {
     if (environment.production && this.api && !uri) {
       return from(this.api.invoke(functions.setBootPartition as any, { body: { partition } }) as Promise<GenericResponse>);

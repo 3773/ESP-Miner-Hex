@@ -83,6 +83,9 @@ REQUIRES
 
 PRIV_REQUIRES
     "app_update"
+    "esp_https_ota"
+    "esp_http_client"
+    "mbedtls"
     "esp_adc"
     "esp_app_format"
     "esp_driver_gpio"

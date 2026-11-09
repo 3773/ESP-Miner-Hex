@@ -19,6 +19,9 @@
 
 #include "dns_server.h"
 #include "esp_ota_ops.h"
+#include "esp_https_ota.h"
+#include "esp_http_client.h"
+#include "esp_crt_bundle.h"
 #include "esp_wifi.h"
 #include "lwip/inet.h"
 #include <arpa/inet.h>
@@ -1822,6 +1825,193 @@ esp_err_t POST_OTA_update(httpd_req_t * req)
     return ESP_OK;
 }
 
+// ---------------------------------------------------------------------------
+// ESP-Miner-Hex: update straight from the releases of github.com/3773/ESP-Miner-Hex
+// The dashboard sends the URL of the release asset esp-miner.bin; the miner
+// downloads it itself over HTTPS (pinned CA bundle), writes it to the free OTA
+// slot, checks the image and reboots. Only assets of this repo are accepted.
+// If anything fails the running firmware stays active.
+// ---------------------------------------------------------------------------
+#define GITHUB_OTA_PREFIX "https://github.com/3773/ESP-Miner-Hex/releases/download/"
+#define GITHUB_OTA_SUFFIX "/esp-miner.bin"
+#define GITHUB_OTA_STACK 12288
+
+static char github_ota_url[256];
+static volatile bool github_ota_running = false;
+
+static void github_ota_set_status(const char *status)
+{
+    snprintf(GLOBAL_STATE->SYSTEM_MODULE.firmware_update_status, 20, "%s", status);
+}
+
+static esp_err_t github_ota_download(void)
+{
+    esp_http_client_config_t http = {
+        .url = github_ota_url,
+        .crt_bundle_attach = esp_crt_bundle_attach,
+        .timeout_ms = 20000,
+        .buffer_size = 4096,       // GitHub redirects with a long signed Location header
+        .buffer_size_tx = 4096,
+        .keep_alive_enable = true,
+        .max_redirection_count = 5,
+    };
+    esp_https_ota_config_t cfg = {
+        .http_config = &http,
+    };
+    esp_https_ota_handle_t handle = NULL;
+
+    github_ota_set_status("Connecting...");
+    esp_err_t err = esp_https_ota_begin(&cfg, &handle);
+    if (err != ESP_OK) {
+        github_ota_set_status("Download Error");
+        return err;
+    }
+
+    esp_app_desc_t desc;
+    err = esp_https_ota_get_img_desc(handle, &desc);
+    if (err != ESP_OK || strcmp(desc.project_name, "esp-miner") != 0) {
+        ESP_LOGE(TAG, "GitHub OTA: not an esp-miner image (%s)", err == ESP_OK ? desc.project_name : esp_err_to_name(err));
+        esp_https_ota_abort(handle);
+        github_ota_set_status("Wrong Image");
+        return ESP_FAIL;
+    }
+    ESP_LOGI(TAG, "GitHub OTA: downloading %s %s", desc.project_name, desc.version);
+
+    int total = esp_https_ota_get_image_size(handle);
+    int last = -1;
+    while ((err = esp_https_ota_perform(handle)) == ESP_ERR_HTTPS_OTA_IN_PROGRESS) {
+        int read = esp_https_ota_get_image_len_read(handle);
+        int percent = total > 0 ? (int) ((int64_t) read * 100 / total) : 0;
+        if (percent != last) {
+            char status[20];
+            snprintf(status, sizeof(status), "Working (%d%%)", percent);
+            github_ota_set_status(status);
+            last = percent;
+        }
+    }
+    if (err != ESP_OK || !esp_https_ota_is_complete_data_received(handle)) {
+        ESP_LOGE(TAG, "GitHub OTA: download failed (%s)", esp_err_to_name(err));
+        esp_https_ota_abort(handle);
+        github_ota_set_status("Download Error");
+        return err != ESP_OK ? err : ESP_FAIL;
+    }
+
+    // checks the image and sets the new boot partition
+    err = esp_https_ota_finish(handle);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "GitHub OTA: image rejected (%s)", esp_err_to_name(err));
+        github_ota_set_status("Validation Error");
+        return err;
+    }
+    return ESP_OK;
+}
+
+static void github_ota_task(void *arg)
+{
+    GLOBAL_STATE->SYSTEM_MODULE.is_firmware_update = true;
+    snprintf(GLOBAL_STATE->SYSTEM_MODULE.firmware_update_filename, 20, "esp-miner.bin");
+    ESP_LOGI(TAG, "GitHub OTA from %s", github_ota_url);
+
+    if (github_ota_download() == ESP_OK) {
+        github_ota_set_status("Rebooting...");
+        // the newly flashed firmware brings its own embedded Web UI
+        SYSTEM_reset_custom_www();
+        ESP_LOGI(TAG, "Restarting System because of GitHub firmware update complete");
+        vTaskDelay(pdMS_TO_TICKS(1500));
+        esp_restart();
+    }
+
+    ESP_LOGE(TAG, "GitHub OTA failed: %s", GLOBAL_STATE->SYSTEM_MODULE.firmware_update_status);
+    // keep the message on the display and in the API for a while
+    vTaskDelay(pdMS_TO_TICKS(15000));
+    GLOBAL_STATE->SYSTEM_MODULE.is_firmware_update = false;
+    github_ota_running = false;
+    vTaskDelete(NULL);
+}
+
+static bool github_ota_url_ok(const char *url)
+{
+    size_t len = strlen(url), pre = strlen(GITHUB_OTA_PREFIX), suf = strlen(GITHUB_OTA_SUFFIX);
+    if (len >= sizeof(github_ota_url) || len <= pre + suf) {
+        return false;
+    }
+    if (strncmp(url, GITHUB_OTA_PREFIX, pre) != 0 || strcmp(url + len - suf, GITHUB_OTA_SUFFIX) != 0) {
+        return false;
+    }
+    // tag part: letters, digits, '.', '-', '_' only
+    for (size_t i = pre; i < len - suf; i++) {
+        char c = url[i];
+        if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '.' || c == '-' || c == '_')) {
+            return false;
+        }
+    }
+    return true;
+}
+
+/*
+ * POST /api/system/OTA/github  {"url": "https://github.com/3773/ESP-Miner-Hex/releases/download/<tag>/esp-miner.bin"}
+ */
+esp_err_t POST_OTA_github(httpd_req_t * req)
+{
+    if (is_network_allowed(req) != ESP_OK) {
+        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
+    }
+
+    wifi_mode_t mode;
+    esp_wifi_get_mode(&mode);
+    if (mode == WIFI_MODE_AP || mode == WIFI_MODE_APSTA) {
+        HTTP_send_json_error(req, "500 Internal Server Error", "Not allowed in AP mode");
+        return ESP_OK;
+    }
+
+    if (github_ota_running || GLOBAL_STATE->SYSTEM_MODULE.is_firmware_update) {
+        HTTP_send_json_error(req, "409 Conflict", "Update already running");
+        return ESP_OK;
+    }
+
+    char body[384];
+    int len = req->content_len;
+    if (len <= 0 || len >= (int) sizeof(body)) {
+        HTTP_send_json_error(req, "400 Bad Request", "Invalid request");
+        return ESP_OK;
+    }
+    int got = 0;
+    while (got < len) {
+        int r = httpd_req_recv(req, body + got, len - got);
+        if (r == HTTPD_SOCK_ERR_TIMEOUT) {
+            continue;
+        }
+        if (r <= 0) {
+            HTTP_send_json_error(req, "400 Bad Request", "Invalid request");
+            return ESP_OK;
+        }
+        got += r;
+    }
+    body[got] = '\0';
+
+    cJSON *root = cJSON_Parse(body);
+    const cJSON *url = root ? cJSON_GetObjectItem(root, "url") : NULL;
+    if (!cJSON_IsString(url) || !github_ota_url_ok(url->valuestring)) {
+        cJSON_Delete(root);
+        HTTP_send_json_error(req, "400 Bad Request", "Only esp-miner.bin from github.com/3773/ESP-Miner-Hex releases");
+        return ESP_OK;
+    }
+    snprintf(github_ota_url, sizeof(github_ota_url), "%s", url->valuestring);
+    cJSON_Delete(root);
+
+    github_ota_running = true;
+    // internal RAM stack: the task writes to flash
+    if (xTaskCreate(github_ota_task, "github_ota", GITHUB_OTA_STACK, NULL, 5, NULL) != pdPASS) {
+        github_ota_running = false;
+        HTTP_send_json_error(req, "500 Internal Server Error", "Could not start the update");
+        return ESP_OK;
+    }
+
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_sendstr(req, "{\"status\":\"started\"}");
+    return ESP_OK;
+}
+
 // HTTP Error (404) Handler - Redirects all requests to the root page
 esp_err_t http_404_error_handler(httpd_req_t * req, httpd_err_code_t err)
 {
@@ -1852,7 +2042,7 @@ esp_err_t start_rest_server(GlobalState * global_state)
     config.uri_match_fn = httpd_uri_match_wildcard;
     config.stack_size = 8192;
     config.max_open_sockets = 20;
-    config.max_uri_handlers = 25;
+    config.max_uri_handlers = 26;
     config.close_fn = websocket_close_fn;
     config.lru_purge_enable = true;
     config.keep_alive_enable = true;
@@ -2013,6 +2203,14 @@ esp_err_t start_rest_server(GlobalState * global_state)
         .user_ctx = NULL
     };
     httpd_register_uri_handler(server, &update_post_ota_firmware);
+
+    httpd_uri_t update_post_ota_github = {
+        .uri = "/api/system/OTA/github",
+        .method = HTTP_POST,
+        .handler = POST_OTA_github,
+        .user_ctx = NULL
+    };
+    httpd_register_uri_handler(server, &update_post_ota_github);
 
     httpd_uri_t update_post_ota_www = {
         .uri = "/api/system/OTAWWW", 

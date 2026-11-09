@@ -55,6 +55,9 @@ static void system_api_add_telemetry(cJSON *root, GlobalState *g) {
     cJSON_AddFloatToObject(root, "temp2", g->POWER_MANAGEMENT_MODULE.chip_temp2_avg);
     cJSON_AddFloatToObject(root, "vrTemp", g->POWER_MANAGEMENT_MODULE.vr_temp);
     cJSON_AddFloatToObject(root, "coreVoltageActual", g->POWER_MANAGEMENT_MODULE.core_voltage);
+    // ESP-Miner-Hex: firmware update state (GitHub update in the dashboard)
+    cJSON_AddBoolToObject(root, "firmwareUpdateRunning", g->SYSTEM_MODULE.is_firmware_update);
+    cJSON_AddStringToObject(root, "firmwareUpdateStatus", g->SYSTEM_MODULE.firmware_update_status);
     if (g->hex_bringup) {
         // bitaxeHex: chips that answered one by one, attempts, voltage per domain (mV)
         cJSON_AddNumberToObject(root, "asicDetected", g->asic_detected);

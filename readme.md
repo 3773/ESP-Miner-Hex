@@ -11,7 +11,7 @@ Fork der offiziellen [Bitaxe ESP-Miner](https://github.com/bitaxeorg/ESP-Miner)-
 - Lüfter beim Start 40 % statt 70 %.
 - Dashboard: Sensor unten in der Mitte als "Board Temperature", Lüfterdrehzahl sichtbar.
 - API zusätzlich: `asicDetected`, `asicInitAttempts`, `stackVoltage`, `domainVoltages` (Rev 304).
-- Update-Seite im Dashboard holt Releases aus diesem Repo.
+- Update-Seite im Dashboard holt Releases aus diesem Repo; mit **Install now** lädt der Miner `esp-miner.bin` selbst von GitHub und flasht es (nur Dateien aus diesem Repo, bei einem Fehler bleibt die alte Firmware aktiv). API: `POST /api/system/OTA/github` mit `{"url": "..."}`.
 
 **Updates:** Der Zweig `master` folgt bitaxeorg/ESP-Miner. Bei einem neuen offiziellen Release wird `hex` auf das neue Tag gesetzt, gebaut und hier als Release `vX.Y.Z-HexFixN` mit `esp-miner.bin` veröffentlicht.
 

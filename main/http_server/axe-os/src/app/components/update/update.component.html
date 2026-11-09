@@ -35,6 +35,15 @@
                   <a style="text-decoration: underline;" target="_blank"
                 [href]="asset.browser_download_url">esp-miner.bin</a>
                 </div>
+                @if ((info$ | async)?.version !== latestRelease.tag_name) {
+                  <button class="btn mt-3" (click)="installFromGithub(asset.browser_download_url)">
+                    <i class="pi pi-download"></i>
+                    <span class="ml-2">Install now</span>
+                  </button>
+                  <div class="text-secondary text-sm mt-1">The miner downloads and flashes it by itself.</div>
+                } @else {
+                  <div class="text-secondary mt-2">This version is installed.</div>
+                }
             } @else {
                 <span class="text-orange-500 mb-3">
                   Firmware binaries are not yet available for this release. Please check back shortly.
@@ -105,7 +114,7 @@
       }
       @if (updateTarget === 'Firmware' && firmwareUpdateProgress !== null) {
         <div class="text-xl mb-3">
-          Uploading... {{ firmwareUpdateProgress }}%
+          {{ githubUpdate ? 'Downloading from GitHub' : 'Uploading' }}... {{ firmwareUpdateProgress }}%
         </div>
       }
       @if ((updateTarget === 'AxeOS' && websiteUpdateProgress === null) || (updateTarget === 'Firmware' && firmwareUpdateProgress === null)) {
