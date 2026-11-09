@@ -116,6 +116,27 @@ export class UpdateComponent {
     }
   }
 
+  // ESP-Miner-Hex: "v2.15.4-HexFix5" -> [2, 15, 4, 5], plain "v2.15.4" -> [2, 15, 4, 0]
+  private versionKey(version: string | undefined | null): number[] {
+    const m = (version ?? '').match(/(\d+)\.(\d+)\.(\d+)(?:-HexFix(\d+))?/i);
+    return m ? [m[1], m[2], m[3], m[4] ?? '0'].map(Number) : [];
+  }
+
+  // only offer "Install now" for a release that is really newer than the installed firmware
+  public isNewerRelease(tag: string, installed: string | undefined | null): boolean {
+    const a = this.versionKey(tag);
+    const b = this.versionKey(installed);
+    if (a.length === 0 || b.length === 0) {
+      return false;
+    }
+    for (let i = 0; i < a.length; i++) {
+      if (a[i] !== b[i]) {
+        return a[i] > b[i];
+      }
+    }
+    return false;
+  }
+
   installFromGithub(url: string) {
     this.updateTarget = 'Firmware';
     this.updateStatus = 'progress';
