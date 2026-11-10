@@ -56,6 +56,18 @@
             </a>
           </li>
         }
+        @if (dashboardEdit.isActive$ | async) {
+          <li>
+            <a class="block py-2 text-main cursor-pointer"
+              tooltipPosition="bottom"
+              [appTooltip]="(dashboardEdit.gaugeView$ | async) ? 'Bar View' : 'Gauge View'"
+              (click)="toggleGaugeView()"
+              >
+              <i class="pi text-xl block"
+              [ngClass]="(dashboardEdit.gaugeView$ | async) ? 'pi-sliders-h' : 'pi-gauge'"></i>
+            </a>
+          </li>
+        }
         <li class="hidden md:block">
           <a class="block py-2 text-main cursor-pointer"
             tooltipPosition="bottom"

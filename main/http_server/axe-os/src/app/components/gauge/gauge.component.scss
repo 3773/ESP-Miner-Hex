@@ -1,0 +1,72 @@
+:host {
+  display: block;
+  width: 100%;
+  min-width: 0;
+}
+
+.gauge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+
+  svg {
+    width: 100%;
+    max-width: 8.5rem;
+    height: auto;
+    overflow: visible;
+  }
+}
+
+.gauge-track,
+.gauge-value {
+  fill: none;
+  stroke-width: 10;
+  stroke-linecap: round;
+}
+
+.gauge-track {
+  stroke: var(--color-progressbar);
+}
+
+.gauge-value {
+  stroke: var(--color-progressbar-value);
+  transition: d 0.3s;
+}
+
+.gauge-marker {
+  stroke: var(--text-color);
+  stroke-width: 1.5;
+}
+
+.gauge-text {
+  fill: var(--text-color);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.gauge-sub {
+  fill: var(--text-color-secondary);
+  font-size: 10px;
+}
+
+.gauge-label {
+  margin-top: -0.6rem;
+  font-size: 0.8rem;
+  color: var(--text-color-secondary);
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.gauge-danger {
+  .gauge-value {
+    stroke: var(--color-red-500, #ef4444);
+  }
+
+  .gauge-text {
+    fill: var(--color-red-500, #ef4444);
+  }
+}

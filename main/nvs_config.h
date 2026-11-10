@@ -84,6 +84,7 @@ typedef enum {
     NVS_CONFIG_TPS546_SYNC_CONFIG,
     NVS_CONFIG_TPS546_FREQUENCY,
     NVS_CONFIG_NOMINAL_VOLTAGE,
+    NVS_CONFIG_DASHBOARD_GAUGES,   // ESP-Miner-Hex: dashboard shows round gauges
     NVS_CONFIG_COUNT
 } NvsConfigKey;
 

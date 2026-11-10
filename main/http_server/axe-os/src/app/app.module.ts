@@ -14,6 +14,7 @@ import { SliderComponent } from './components/slider/slider.component';
 import { AppChartComponent } from './components/chart/app-chart.component';
 import { DropdownComponent } from './components/dropdown/dropdown.component';
 import { ProgressbarComponent } from './components/progressbar/progressbar.component';
+import { GaugeComponent } from './components/gauge/gauge.component';
 
 import { AppRoutingModule } from './app-routing.module';
 import { AppComponent } from './app.component';
@@ -93,6 +94,7 @@ const components = [
     EditComponent,
     SettingsComponent,
     ProgressbarComponent,
+    GaugeComponent,
     ANSIPipe,
     DateAgoPipe,
     HashSuffixPipe,

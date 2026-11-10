@@ -243,6 +243,18 @@
         <div class="card">
           <h4 class="text-center font-medium">Power</h4>
 
+          @if (gaugeView) {
+            <div class="gauge-grid">
+              <app-gauge label="Power" [value]="info.power" [max]="info.maxPower" unit="W" [decimals]="1"></app-gauge>
+              <app-gauge label="Input" [value]="info.voltage" [max]="info.nominalVoltage + .5" unit="V" [decimals]="2"
+                [marker]="info.nominalVoltage" [danger]="info.voltage < info.nominalVoltage * 0.949"></app-gauge>
+              <app-gauge label="Frequency" [value]="info.actualFrequency" [max]="maxFrequency" unit="MHz"></app-gauge>
+              <app-gauge label="ASIC Voltage" [value]="info.coreVoltageActual" [max]="1.8" unit="V" [decimals]="3"></app-gauge>
+            </div>
+            @if (info.voltage < (info.nominalVoltage) * 0.949) {
+              <strong class="block text-center text-red-500 mt-2">Danger: Low Voltage</strong>
+            }
+          } @else {
           <div class="mb-4">
             <h6 class="flex justify-between mb-1">
               Power<span>{{info.power}} W</span>
@@ -279,6 +291,7 @@
             </h6>
             <app-progressbar [value]="(info.coreVoltageActual / 1.8) * 100"></app-progressbar>
           </div>
+          }
         </div>
       </div>
     </div>
@@ -289,6 +302,24 @@
         <div class="card">
           <h4 class="text-center font-medium">Heat</h4>
 
+          @if (gaugeView) {
+            <div class="gauge-grid">
+              <app-gauge [label]="info.temp2 > 0 && info.boardVersion !== '302' && info.boardVersion !== '303' ? 'ASIC Temp 1' : 'ASIC Temp'"
+                [value]="info.temp" [max]="maxTemp" unit="°C" [decimals]="1" [empty]="!(info.temp > 0)" [danger]="info.temp >= 70"
+                [marker]="info.autofanspeed === 1 && 0 >= info.temp2 ? info.temptarget : null"></app-gauge>
+              @if (info.temp2 > 0) {
+                <app-gauge [label]="info.boardVersion === '302' || info.boardVersion === '303' ? 'Board Temp' : 'ASIC Temp 2'"
+                  [value]="info.temp2" [max]="maxTemp" unit="°C" [decimals]="1" [danger]="info.temp2 >= 70"
+                  [marker]="info.autofanspeed === 1 ? info.temptarget : null"></app-gauge>
+              }
+              @if (info.vrTemp > 0) {
+                <app-gauge label="Regulator Temp" [value]="info.vrTemp" [max]="120" unit="°C" [danger]="info.vrTemp >= 105"></app-gauge>
+              }
+            </div>
+            @if (info.temp >= 70 || info.temp2 >= 70 || info.vrTemp >= 105) {
+              <strong class="block text-center text-red-500 mt-2">Danger: High Temperature</strong>
+            }
+          } @else {
           <div class="mb-4">
             <h6 class="flex justify-between mb-1">
               @if (info.temp2 > 0 && info.boardVersion !== '302' && info.boardVersion !== '303') {
@@ -355,6 +386,7 @@
               }
             </div>
           }
+          }
         </div>
       </div>
     </div>
@@ -365,6 +397,17 @@
         <div class="card">
           <h4 class="text-center font-medium">Fan</h4>
 
+          @if (gaugeView) {
+            <div class="gauge-grid">
+              <app-gauge [label]="info.fan2rpm > 0 && info.fanrpm > 0 ? 'Fan Speeds' : 'Fan Speed'" [value]="info.fanspeed" [max]="100" unit="%"></app-gauge>
+              @if (info.fanrpm > 0) {
+                <app-gauge [label]="info.fan2rpm > 0 ? 'Fan 1' : 'Fan RPM'" [value]="info.fanrpm" [max]="maxRpm" sub="RPM"></app-gauge>
+              }
+              @if (info.fan2rpm > 0) {
+                <app-gauge [label]="info.fanrpm > 0 ? 'Fan 2' : 'Fan RPM'" [value]="info.fan2rpm" [max]="maxRpm" sub="RPM"></app-gauge>
+              }
+            </div>
+          } @else {
           <div class="mb-4">
             <h6 class="flex justify-between mb-1" tooltipPosition="top"
                 appTooltip="{{info.fan2rpm > 0 ? 'Fan 1: ' : ''}}{{info.fanrpm}} RPM{{info.fan2rpm > 0 ? '<br>Fan 2: ' + info.fan2rpm + ' RPM' : ''}}">
@@ -391,6 +434,7 @@
               </h6>
             }
           </div>
+          }
         </div>
       </div>
     </div>

@@ -26,6 +26,21 @@ export class DashboardEditService {
 
   hiddenWidgets = new Set<string>();
 
+  // ESP-Miner-Hex: round gauges instead of bars (saved in the miner as dashboardGauges)
+  gaugeView$ = new BehaviorSubject<boolean>(false);
+
+  private gaugeViewLoaded = false;
+
+  // take the saved view from the first system info only, so a toggle is not
+  // undone by a live update that was sent before the change was saved
+  syncGaugeView(value: unknown): void {
+    if (this.gaugeViewLoaded || value === undefined || value === null) {
+      return;
+    }
+    this.gaugeViewLoaded = true;
+    this.gaugeView$.next(Number(value) === 1);
+  }
+
   toggleEditMode(): void {
     this.editMode$.next(!this.editMode$.value);
   }

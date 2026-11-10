@@ -10,6 +10,7 @@ Fork der offiziellen [Bitaxe ESP-Miner](https://github.com/bitaxeorg/ESP-Miner)-
 - Alle 6 Chips werden adressiert und einzeln abgefragt, bis zu 3 Versuche.
 - Lüfter beim Start 40 % statt 70 %.
 - Dashboard: Sensor unten in der Mitte als "Board Temperature", Lüfterdrehzahl sichtbar.
+- Dashboard: Umschalter oben (Symbol Tacho / Regler) zwischen Balken und **Kreis-Anzeigen** im Stil des alten AxeOS für Power, Heat und Fan. Die Wahl wird im Miner gespeichert (`dashboardGauges` 0/1) und gilt für alle Browser.
 - API zusätzlich: `asicDetected`, `asicInitAttempts`, `stackVoltage`, `domainVoltages` (Rev 304).
 - Update-Seite im Dashboard holt Releases aus diesem Repo; mit **Install now** lädt der Miner `esp-miner.bin` selbst von GitHub und flasht es (nur Dateien aus diesem Repo, bei einem Fehler bleibt die alte Firmware aktiv). API: `POST /api/system/OTA/github` mit `{"url": "..."}`.
 

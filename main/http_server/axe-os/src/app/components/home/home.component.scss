@@ -164,3 +164,11 @@ app-chart {
     }
 }
 
+
+// ESP-Miner-Hex: round gauges (gauge view)
+.gauge-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(5.5rem, 22%), 1fr));
+    gap: 0.25rem 0.75rem;
+    align-items: start;
+}

@@ -460,6 +460,9 @@ components:
         invertscreen:
           type: number
           description: Screen invert setting (0=normal, 1=inverted)
+        dashboardGauges:
+          type: number
+          description: "ESP-Miner-Hex: dashboard shows round gauges instead of bars (0=bars, 1=gauges)"
         isPSRAMAvailable:
           type: number
           description: Whether PSRAM is available (0=no, 1=yes)
@@ -975,6 +978,12 @@ components:
         invertscreen:
           type: integer
           description: Whether to invert screen colors (0=normal, 1=inverted)
+          enum: [0, 1]
+          examples:
+            - 0
+        dashboardGauges:
+          type: integer
+          description: "ESP-Miner-Hex: show round gauges on the dashboard instead of bars (0=bars, 1=gauges)"
           enum: [0, 1]
           examples:
             - 0

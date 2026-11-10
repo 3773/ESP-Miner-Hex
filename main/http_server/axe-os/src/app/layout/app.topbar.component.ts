@@ -47,12 +47,24 @@ export class AppTopBarComponent implements OnInit, OnDestroy {
       if ((info as any).miningPaused !== undefined) {
         this.isMiningPaused = (info as any).miningPaused;
       }
+      this.dashboardEdit.syncGaugeView((info as any).dashboardGauges);
     });
   }
 
   ngOnDestroy() {
     this.destroy$.next();
     this.destroy$.complete();
+  }
+
+  // ESP-Miner-Hex: switch the dashboard between bars and round gauges
+  public toggleGaugeView() {
+    const gauges = !this.dashboardEdit.gaugeView$.value;
+    this.dashboardEdit.gaugeView$.next(gauges);
+    this.systemService.updateSystem('', { dashboardGauges: gauges ? 1 : 0 })
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        error: () => this.toastr.error('Could not save the dashboard view on the device'),
+      });
   }
 
   public toggleSensitiveData() {

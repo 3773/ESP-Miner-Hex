@@ -142,6 +142,7 @@ export class HomeComponent implements OnInit, OnDestroy {
   }
   private grid!: GridStack;
   public editMode = false;
+  public gaugeView = false;
   public widgetDefs = WIDGET_DEFAULTS;
   public hiddenWidgets = new Set<string>();
   private stashedWidgets = new Map<string, HTMLElement>();
@@ -243,6 +244,10 @@ export class HomeComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     this.dashboardEditService.widgetDefs = this.widgetDefs;
     this.dashboardEditService.isActive$.next(true);
+
+    this.dashboardEditService.gaugeView$
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(gauges => this.gaugeView = gauges);
 
     this.dashboardEditService.editMode$
       .pipe(takeUntil(this.destroy$))
