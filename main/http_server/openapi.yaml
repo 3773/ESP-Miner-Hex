@@ -463,6 +463,9 @@ components:
         dashboardGauges:
           type: number
           description: "ESP-Miner-Hex: dashboard shows round gauges instead of bars (0=bars, 1=gauges)"
+        dashboardRefresh:
+          type: number
+          description: "ESP-Miner-Hex: dashboard refresh interval in seconds (1-30)"
         isPSRAMAvailable:
           type: number
           description: Whether PSRAM is available (0=no, 1=yes)
@@ -987,6 +990,13 @@ components:
           enum: [0, 1]
           examples:
             - 0
+        dashboardRefresh:
+          type: integer
+          description: "ESP-Miner-Hex: dashboard refresh interval in seconds"
+          minimum: 1
+          maximum: 30
+          examples:
+            - 5
         autofanspeed:
           type: integer
           description: Whether to enable automatic fan speed control (0=manual, 1=auto)

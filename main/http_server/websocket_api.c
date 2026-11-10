@@ -8,10 +8,14 @@
 #include "websocket_api.h"
 #include "websocket.h"
 #include "global_state.h"
+#include "nvs_config.h"
 #include "system_api_json.h"
 #include "cjson_utils.h"
 
 #define WEBSOCKET_API_RATE_LIMIT_MS 500
+// ESP-Miner-Hex: push less often when the dashboard refresh is slower, but at
+// least every 5 s so the dashboard does not take the connection for dead
+#define WEBSOCKET_API_MAX_INTERVAL_MS 5000
 
 static const char *TAG = "websocket_api";
 static GlobalState *GLOBAL_STATE = NULL;
@@ -102,7 +106,10 @@ void websocket_api_task(void *pvParameters)
     cJSON *last_full_json = system_api_get_full_json(GLOBAL_STATE);
 
     while (true) {
-        vTaskDelay(pdMS_TO_TICKS(WEBSOCKET_API_RATE_LIMIT_MS));
+        int interval_ms = nvs_config_get_u16(NVS_CONFIG_DASHBOARD_REFRESH) * 1000;
+        if (interval_ms < WEBSOCKET_API_RATE_LIMIT_MS) interval_ms = WEBSOCKET_API_RATE_LIMIT_MS;
+        if (interval_ms > WEBSOCKET_API_MAX_INTERVAL_MS) interval_ms = WEBSOCKET_API_MAX_INTERVAL_MS;
+        vTaskDelay(pdMS_TO_TICKS(interval_ms));
 
         // If no clients are connected, hibernate to save CPU/Memory churn
         if (websocket_get_active_client_count(WS_TYPE_API) == 0) {

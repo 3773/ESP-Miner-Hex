@@ -58,6 +58,16 @@
         }
         @if (dashboardEdit.isActive$ | async) {
           <li>
+            <a class="hidden sm:flex items-center gap-1 py-2 text-main cursor-pointer select-none"
+              tooltipPosition="bottom"
+              appTooltip="Refresh every {{liveDataService.refreshSeconds$ | async}} s - click to change"
+              (click)="cycleRefresh()"
+              >
+              <i class="pi pi-clock text-xl block"></i>
+              <small class="font-medium">{{liveDataService.refreshSeconds$ | async}}s</small>
+            </a>
+          </li>
+          <li>
             <a class="block py-2 text-main cursor-pointer"
               tooltipPosition="bottom"
               [appTooltip]="(dashboardEdit.gaugeView$ | async) ? 'Bar View' : 'Gauge View'"

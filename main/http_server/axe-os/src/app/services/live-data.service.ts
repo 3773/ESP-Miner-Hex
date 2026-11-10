@@ -24,6 +24,10 @@ export class LiveDataService {
   private connectedSubject = new BehaviorSubject<boolean>(false);
   public connected$ = this.connectedSubject.asObservable();
 
+  // ESP-Miner-Hex: how often the dashboard shows new values (device setting dashboardRefresh)
+  public refreshSeconds$ = new BehaviorSubject<number>(1);
+  private refreshLoaded = false;
+
   constructor(
     private systemService: SystemApiService
   ) {
@@ -59,9 +63,11 @@ export class LiveDataService {
 
     const updates$ = merge(
       this.connect().pipe(switchMap(() => EMPTY), catchError(() => EMPTY)),
-      this.updates$.pipe(
-        // Buffer updates to handle bursts when tab is resumed (1000ms = 1Hz UI refresh)
-        bufferTime(1000),
+      this.refreshSeconds$.pipe(
+        distinctUntilChanged(),
+        // Buffer updates to handle bursts when tab is resumed; the window is the
+        // dashboard refresh interval (ESP-Miner-Hex, default 1 s = upstream)
+        switchMap(seconds => this.updates$.pipe(bufferTime(Math.max(1, seconds) * 1000))),
         filter(msgs => msgs.length > 0),
         map(msgs => msgs.reduce((acc, curr) => ({ ...acc, ...curr }), {} as Partial<ISystemInfo>))
       ),
@@ -79,8 +85,19 @@ export class LiveDataService {
       scan((acc: ISystemInfo, curr: Partial<ISystemInfo>) => ({ ...acc, ...curr } as ISystemInfo), {} as ISystemInfo),
       // Ensure we have at least once received a message with a recognizable field before emitting
       filter(info => !!info.version || !!info.uptimeSeconds),
+      tap(info => this.syncRefresh((info as any).dashboardRefresh)),
       shareReplay(1)
     );
+  }
+
+  // take the saved interval from the first system info only
+  private syncRefresh(value: unknown): void {
+    const seconds = Number(value);
+    if (this.refreshLoaded || !isFinite(seconds) || seconds < 1) {
+      return;
+    }
+    this.refreshLoaded = true;
+    this.refreshSeconds$.next(seconds);
   }
 
   private connect(): Observable<any> {

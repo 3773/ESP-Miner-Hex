@@ -9,7 +9,7 @@ cmake_minimum_required(VERSION 3.16)
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 
 # ESP-Miner-Hex (github.com/3773/ESP-Miner-Hex): ESP-Miner v2.15.4 + bitaxeHex fix
-set(PROJECT_VER "v2.15.4-HexFix7")
+set(PROJECT_VER "v2.15.4-HexFix8")
 
 
 project(esp-miner)

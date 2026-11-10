@@ -28,7 +28,7 @@ export class AppTopBarComponent implements OnInit, OnDestroy {
   constructor(
     public layoutService: LayoutService,
     private systemService: SystemApiService,
-    private liveDataService: LiveDataService,
+    public liveDataService: LiveDataService,
     private toastr: ToastrService,
     private sensitiveData: SensitiveData,
     public dashboardEdit: DashboardEditService,
@@ -54,6 +54,20 @@ export class AppTopBarComponent implements OnInit, OnDestroy {
   ngOnDestroy() {
     this.destroy$.next();
     this.destroy$.complete();
+  }
+
+  // ESP-Miner-Hex: dashboard refresh interval, one click = next step
+  public readonly refreshSteps = [1, 2, 5, 10, 30];
+
+  public cycleRefresh() {
+    const current = this.liveDataService.refreshSeconds$.value;
+    const next = this.refreshSteps.find(s => s > current) ?? this.refreshSteps[0];
+    this.liveDataService.refreshSeconds$.next(next);
+    this.systemService.updateSystem('', { dashboardRefresh: next })
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        error: () => this.toastr.error('Could not save the refresh interval on the device'),
+      });
   }
 
   // ESP-Miner-Hex: switch the dashboard between bars and round gauges
