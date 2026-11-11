@@ -466,6 +466,9 @@ components:
         dashboardRefresh:
           type: number
           description: "ESP-Miner-Hex: dashboard refresh interval in seconds (1-30)"
+        fullCoreReset:
+          type: number
+          description: "ESP-Miner-Hex: restart fix on (1) or off (0)"
         isPSRAMAvailable:
           type: number
           description: Whether PSRAM is available (0=no, 1=yes)
@@ -997,6 +1000,12 @@ components:
           maximum: 30
           examples:
             - 5
+        fullCoreReset:
+          type: integer
+          description: "ESP-Miner-Hex: restart fix - every CPU-only reset becomes a full core reset like the reset button (0=off, 1=on)"
+          enum: [0, 1]
+          examples:
+            - 0
         autofanspeed:
           type: integer
           description: Whether to enable automatic fan speed control (0=manual, 1=auto)

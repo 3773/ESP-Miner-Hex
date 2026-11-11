@@ -4,6 +4,9 @@
 #include "esp_log.h"
 #include "esp_psram.h"
 #include "esp_heap_caps.h"
+#include "esp_attr.h"
+#include "esp_rom_sys.h"
+#include "soc/reset_reasons.h"
 #include "cJSON.h"
 
 #include "asic_result_task.h"
@@ -59,6 +62,59 @@ static void cjson_free_psram(void *ptr)
     free(ptr);
 }
 
+// ESP-Miner-Hex: optional restart fix (setting "Full Restart", NVS fullcorereset).
+// Some boards (seen on a GekkoScience Gamma 601) find 0 chips after a CPU-only
+// reset (restart from the web UI, OTA, panic, watchdog), while the reset button,
+// USB or a power cycle reset the whole digital core and work. With the setting
+// on, every CPU-only reset is turned into one full core reset. The RTC_NOINIT
+// flag survives that reset and stops a loop; the reason of the first boot is
+// kept so the API still shows panics and watchdogs. Off = official behaviour.
+#define CORE_RESET_MAGIC 0x48455852u
+static RTC_NOINIT_ATTR uint32_t core_reset_magic;
+static RTC_NOINIT_ATTR uint32_t core_reset_from;
+static RTC_NOINIT_ATTR uint32_t core_reset_reason;
+static esp_reset_reason_t boot_reset_reason = ESP_RST_UNKNOWN;
+
+esp_reset_reason_t SYSTEM_reset_reason(void)
+{
+    return boot_reset_reason == ESP_RST_UNKNOWN ? esp_reset_reason() : boot_reset_reason;
+}
+
+static void escalate_cpu_reset(void)
+{
+    soc_reset_reason_t reason = esp_rom_get_reset_reason(0);
+    boot_reset_reason = esp_reset_reason();
+
+    if (core_reset_magic == CORE_RESET_MAGIC) {
+        core_reset_magic = 0;
+        boot_reset_reason = (esp_reset_reason_t) core_reset_reason;
+        ESP_LOGW(TAG, "Full restart done (CPU reset 0x%02x -> 0x%02x), original reset reason %d",
+                 (unsigned) core_reset_from, (unsigned) reason, (int) boot_reset_reason);
+        return;
+    }
+
+    if (!nvs_config_get_bool(NVS_CONFIG_FULL_CORE_RESET)) {
+        return;
+    }
+
+    switch (reason) {
+    case RESET_REASON_CPU0_SW:
+    case RESET_REASON_CPU0_MWDT0:
+    case RESET_REASON_CPU0_MWDT1:
+    case RESET_REASON_CPU0_RTC_WDT:
+        break;
+    default:
+        return;
+    }
+
+    ESP_LOGW(TAG, "CPU-only reset (0x%02x) and Full Restart is on: resetting the whole chip", (unsigned) reason);
+    core_reset_from = reason;
+    core_reset_reason = boot_reset_reason;
+    core_reset_magic = CORE_RESET_MAGIC;
+    vTaskDelay(pdMS_TO_TICKS(20));
+    esp_rom_software_reset_system();
+}
+
 void app_main(void)
 {
     ESP_ERROR_CHECK(heap_caps_register_failed_alloc_callback(heap_alloc_failed_hook));
@@ -100,6 +156,9 @@ void app_main(void)
         ESP_LOGE(TAG, "Failed to init NVS");
         return;
     }
+
+    // ESP-Miner-Hex: before anything talks to the voltage regulator or the ASICs
+    escalate_cpu_reset();
 
     // Check firmware version migration (resets useCustomWWW on update/downgrade)
     SYSTEM_check_firmware_migration();

@@ -86,6 +86,7 @@ typedef enum {
     NVS_CONFIG_NOMINAL_VOLTAGE,
     NVS_CONFIG_DASHBOARD_GAUGES,   // ESP-Miner-Hex: dashboard shows round gauges
     NVS_CONFIG_DASHBOARD_REFRESH,  // ESP-Miner-Hex: dashboard refresh interval in seconds
+    NVS_CONFIG_FULL_CORE_RESET,    // ESP-Miner-Hex: restart fix, CPU-only resets become a full core reset
     NVS_CONFIG_COUNT
 } NvsConfigKey;
 

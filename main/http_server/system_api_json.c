@@ -144,7 +144,7 @@ static void system_api_add_config(cJSON *root, GlobalState *g) {
     cJSON_AddNumberToObject(root, "smallCoreCount", g->DEVICE_CONFIG.family.asic.small_core_count);
     cJSON_AddStringToObject(root, "ASICModel", g->DEVICE_CONFIG.family.asic.name ? g->DEVICE_CONFIG.family.asic.name : "Unknown");
     cJSON_AddNumberToObject(root, "isPSRAMAvailable", g->psram_is_available ? 1 : 0);
-    cJSON_AddStringToObject(root, "resetReason", get_reset_reason_str(esp_reset_reason()));
+    cJSON_AddStringToObject(root, "resetReason", get_reset_reason_str(SYSTEM_reset_reason()));
     
     const esp_partition_t *running = esp_ota_get_running_partition();
     cJSON_AddStringToObject(root, "runningPartition", running ? running->label : "Unknown");
@@ -242,6 +242,7 @@ static void system_api_add_config(cJSON *root, GlobalState *g) {
     cJSON_AddNumberToObject(root, "invertscreen", nvs_config_get_bool(NVS_CONFIG_INVERT_SCREEN) ? 1 : 0);
     cJSON_AddNumberToObject(root, "dashboardGauges", nvs_config_get_bool(NVS_CONFIG_DASHBOARD_GAUGES) ? 1 : 0);
     cJSON_AddNumberToObject(root, "dashboardRefresh", nvs_config_get_u16(NVS_CONFIG_DASHBOARD_REFRESH));
+    cJSON_AddNumberToObject(root, "fullCoreReset", nvs_config_get_bool(NVS_CONFIG_FULL_CORE_RESET) ? 1 : 0);
     cJSON_AddNumberToObject(root, "displayTimeout", nvs_config_get_i32(NVS_CONFIG_DISPLAY_TIMEOUT));
     cJSON_AddNumberToObject(root, "autofanspeed", nvs_config_get_bool(NVS_CONFIG_AUTO_FAN_SPEED) ? 1 : 0);
     cJSON_AddNumberToObject(root, "manualFanSpeed", nvs_config_get_u16(NVS_CONFIG_MANUAL_FAN_SPEED));

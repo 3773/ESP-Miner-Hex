@@ -2,6 +2,7 @@
 #define SYSTEM_H_
 
 #include "esp_err.h"
+#include "esp_system.h"
 
 #include "sv2_protocol.h"
 
@@ -18,6 +19,8 @@ typedef enum {
 #define STRATUM_V2 "SV2"
 
 void SYSTEM_check_firmware_migration(void);
+// ESP-Miner-Hex: reset reason of this boot, kept across the optional full core reset (main.c)
+esp_reset_reason_t SYSTEM_reset_reason(void);
 void SYSTEM_reset_custom_www(void);
 void SYSTEM_init_system(GlobalState * GLOBAL_STATE);
 void SYSTEM_init_versions(GlobalState * GLOBAL_STATE);

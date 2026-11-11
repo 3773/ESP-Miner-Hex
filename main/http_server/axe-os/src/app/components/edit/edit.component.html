@@ -151,6 +151,23 @@
         </div>
       </div>
     </div>
+    <h3 class="mt-5">Restart</h3>
+    <div class="card">
+      <div class="flex flex-col md:flex-row md:items-start gap-2">
+        <label for="fullCoreReset" class="w-full md:w-2/12 font-medium cursor-pointer select-none">Full Restart</label>
+        <div class="w-full md:w-10/12">
+          <div class="flex items-center">
+            <app-checkbox name="fullCoreReset" formControlName="fullCoreReset" inputId="fullCoreReset" [binary]="true"></app-checkbox>
+          </div>
+          <small class="block mt-2 text-secondary">
+            Restart fix (ESP-Miner-Hex). Turn this on only if the miner finds 0 chips after a restart from this page,
+            after a firmware update or after a crash, while the reset button or unplugging it works.
+            Every restart then resets the whole chip like the reset button.
+            Off = same behaviour as the official firmware. Takes effect at the next restart.
+          </small>
+        </div>
+      </div>
+    </div>
     <h3 class="mt-5">Statistics</h3>
     <div class="card">
       <div class="flex flex-col md:flex-row md:items-center gap-2">
