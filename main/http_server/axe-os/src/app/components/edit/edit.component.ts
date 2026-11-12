@@ -316,7 +316,7 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
 
   private updateSelectOptions() {
     this.selectFrequencyOptions = this.buildSelectOptions('frequency', this.frequencyOptions, this.defaultFrequency);
-    this.selectVoltageOptions = this.buildSelectOptions('coreVoltage', this.voltageOptions, this.defaultVoltage);
+    this.selectVoltageOptions = this.buildSelectOptions('coreVoltage', this.voltageSteps(this.voltageOptions), this.defaultVoltage);
   }
 
   get displayOptions(): SelectOption[] {
@@ -347,6 +347,20 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
     return STATS_FREQUENCY_STEPS[this.statsFrequencyMaxSteps];
   }
 
+  /** ESP-Miner-Hex: offer the core voltage in 10 mV steps across the preset range, keeping the presets themselves. */
+  voltageSteps(apiOptions: number[]): number[] {
+    const valid = (apiOptions || []).filter(v => Number.isFinite(v) && v > 0);
+    if (!valid.length) {
+      return [];
+    }
+    const steps = new Set<number>(valid);
+    const first = Math.ceil(Math.min(...valid) / 10) * 10;
+    for (let mv = first; mv <= Math.max(...valid); mv += 10) {
+      steps.add(mv);
+    }
+    return [...steps].sort((a, b) => a - b);
+  }
+
   buildSelectOptions(formField: string, apiOptions: number[], defaultValue: number): SelectOption[] {
     if (!apiOptions.length) {
       return [];
@@ -366,7 +380,7 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
     // If current field value exists and isn't in the options
     if (currentValue && !options.some(opt => opt.value === currentValue)) {
       options.push({
-        name: `${currentValue} (Custom)`,
+        name: `${currentValue}`,
         value: currentValue
       });
       // Sort options by value
